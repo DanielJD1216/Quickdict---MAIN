@@ -178,6 +178,12 @@ struct DictationView: View {
             Text(appStatus.outputMessage)
                 .font(.caption)
                 .foregroundColor(.secondary)
+
+            if !appStatus.transformDebug.isEmpty {
+                Text("Transform: \(appStatus.transformDebug)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)

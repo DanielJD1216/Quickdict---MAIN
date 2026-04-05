@@ -18,26 +18,19 @@ final class HotkeyManager {
     private(set) var statusMessage = "Not registered"
     private var triggerPressedAt: CFAbsoluteTime = 0
     private var releaseVerificationWorkItem: DispatchWorkItem?
-    
-    private var keyCode: CGKeyCode = 0x3D // Right Option
+
+    private var keyCode: CGKeyCode = CGKeyCode(kVK_RightOption)
     private var modifiers: CGEventFlags = .maskAlternate
+    private var mode: TriggerConfiguration.Mode = .modifierOnly
 
     private init() {}
 
-    func register(trigger: TriggerKeyOption) {
+    func register(trigger: TriggerConfiguration) {
         unregister()
 
-        switch trigger {
-        case .rightOption:
-            keyCode = 0x3D // kVK_RightOption
-            modifiers = .maskAlternate
-        case .fnGlobe:
-            keyCode = 0x3F // kVK_Function
-            modifiers = .maskSecondaryFn
-        case .custom:
-            keyCode = 0x3D
-            modifiers = .maskAlternate
-        }
+        keyCode = CGKeyCode(trigger.keyCode)
+        modifiers = cgFlags(from: trigger.modifiers)
+        mode = trigger.mode
 
         if !CGPreflightListenEventAccess() {
             _ = CGRequestListenEventAccess()
@@ -52,8 +45,8 @@ final class HotkeyManager {
 
         let eventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
 
-        let callback: CGEventTapCallBack = { proxy, type, event, refcon in
-            guard let refcon = refcon else { return Unmanaged.passRetained(event) }
+        let callback: CGEventTapCallBack = { _, type, event, refcon in
+            guard let refcon else { return Unmanaged.passRetained(event) }
             let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
 
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
@@ -64,39 +57,24 @@ final class HotkeyManager {
                     Task { @MainActor in
                         AppStatusCenter.shared.setHotkey(ready: true, message: manager.statusMessage)
                     }
-                    print("[Hotkey] Re-enabled event tap after system disable")
                 }
                 return Unmanaged.passUnretained(event)
             }
-            
-            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-            let flags = event.flags
-            
-            // Modifier-only triggers arrive as flagsChanged events.
-            if keyCode == manager.keyCode {
-                let isTriggerPressed = manager.triggerIsPressed(in: flags)
-                
-                if type == .flagsChanged && isTriggerPressed && !manager.isRecording {
-                    print("[Hotkey] Trigger pressed")
-                    manager.isRecording = true
-                    manager.triggerPressedAt = CFAbsoluteTimeGetCurrent()
-                    manager.releaseVerificationWorkItem?.cancel()
-                    manager.releaseVerificationWorkItem = nil
-                    DispatchQueue.main.async {
-                        manager.onTriggerPressed?()
-                    }
-                } else if type == .flagsChanged && !isTriggerPressed && manager.isRecording {
-                    let heldDuration = CFAbsoluteTimeGetCurrent() - manager.triggerPressedAt
-                    print("[Hotkey] Trigger release candidate after \(String(format: "%.3f", heldDuration))s")
-                    manager.scheduleReleaseVerification(heldDuration: heldDuration)
-                }
+
+            let eventKeyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
+            let flags = manager.normalized(event.flags)
+
+            switch manager.mode {
+            case .modifierOnly:
+                manager.handleModifierOnlyEvent(type: type, keyCode: eventKeyCode, flags: flags)
+            case .keyCombo:
+                manager.handleKeyComboEvent(type: type, keyCode: eventKeyCode, flags: flags)
             }
-            
+
             return Unmanaged.passUnretained(event)
         }
 
         let refcon = Unmanaged.passUnretained(self).toOpaque()
-        
         eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
@@ -106,37 +84,38 @@ final class HotkeyManager {
             userInfo: refcon
         )
 
-        guard let eventTap = eventTap else {
+        guard let eventTap else {
             isHotkeyReady = false
             statusMessage = "Failed to create event tap"
             Task { @MainActor in
                 AppStatusCenter.shared.setHotkey(ready: false, message: self.statusMessage)
             }
-            print("[Hotkey] Failed to create event tap")
             return
         }
 
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: eventTap, enable: true)
+
         isHotkeyReady = true
-        statusMessage = "Ready"
+        statusMessage = "Ready: \(trigger.displayName)"
         Task { @MainActor in
             AppStatusCenter.shared.setHotkey(ready: true, message: self.statusMessage)
         }
-
         print("[Hotkey] Registered trigger: \(trigger.displayName)")
     }
 
     func unregister() {
-        if let eventTap = eventTap {
+        if let eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
         }
-        if let runLoopSource = runLoopSource {
+        if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         }
         eventTap = nil
         runLoopSource = nil
+        releaseVerificationWorkItem?.cancel()
+        releaseVerificationWorkItem = nil
         isHotkeyReady = false
         statusMessage = "Not registered"
         Task { @MainActor in
@@ -150,7 +129,47 @@ final class HotkeyManager {
         triggerPressedAt = 0
         releaseVerificationWorkItem?.cancel()
         releaseVerificationWorkItem = nil
-        print("[Hotkey] Recording state reset")
+    }
+
+    private func handleModifierOnlyEvent(type: CGEventType, keyCode eventKeyCode: CGKeyCode, flags: CGEventFlags) {
+        guard eventKeyCode == keyCode else { return }
+        let isTriggerPressed = triggerIsPressed(in: flags)
+
+        if type == .flagsChanged && isTriggerPressed && !isRecording {
+            beginRecordingTrigger()
+        } else if type == .flagsChanged && !isTriggerPressed && isRecording {
+            let heldDuration = CFAbsoluteTimeGetCurrent() - triggerPressedAt
+            scheduleReleaseVerification(heldDuration: heldDuration)
+        }
+    }
+
+    private func handleKeyComboEvent(type: CGEventType, keyCode eventKeyCode: CGKeyCode, flags: CGEventFlags) {
+        let requiredFlags = normalized(modifiers)
+        let matchesKey = eventKeyCode == keyCode
+        let matchesModifiers = flags.contains(requiredFlags)
+
+        if type == .keyDown && matchesKey && matchesModifiers && !isRecording {
+            beginRecordingTrigger()
+        } else if type == .keyUp && matchesKey && isRecording {
+            finishRecordingTrigger()
+        }
+    }
+
+    private func beginRecordingTrigger() {
+        isRecording = true
+        triggerPressedAt = CFAbsoluteTimeGetCurrent()
+        releaseVerificationWorkItem?.cancel()
+        releaseVerificationWorkItem = nil
+        DispatchQueue.main.async {
+            self.onTriggerPressed?()
+        }
+    }
+
+    private func finishRecordingTrigger() {
+        isRecording = false
+        DispatchQueue.main.async {
+            self.onTriggerReleased?()
+        }
     }
 
     private func triggerIsPressed(in flags: CGEventFlags) -> Bool {
@@ -173,19 +192,28 @@ final class HotkeyManager {
 
             let stillPressed = CGEventSource.keyState(.hidSystemState, key: self.keyCode)
             if stillPressed {
-                print("[Hotkey] Ignored false release; trigger still physically pressed")
                 return
             }
 
-            print("[Hotkey] Trigger release confirmed")
-            self.isRecording = false
-            DispatchQueue.main.async {
-                self.onTriggerReleased?()
-            }
+            self.finishRecordingTrigger()
         }
 
         releaseVerificationWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    private func cgFlags(from flags: NSEvent.ModifierFlags) -> CGEventFlags {
+        var result: CGEventFlags = []
+        if flags.contains(.command) { result.insert(.maskCommand) }
+        if flags.contains(.shift) { result.insert(.maskShift) }
+        if flags.contains(.option) { result.insert(.maskAlternate) }
+        if flags.contains(.control) { result.insert(.maskControl) }
+        if flags.contains(.function) { result.insert(.maskSecondaryFn) }
+        return result
+    }
+
+    private func normalized(_ flags: CGEventFlags) -> CGEventFlags {
+        flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl, .maskSecondaryFn])
     }
 
     deinit {

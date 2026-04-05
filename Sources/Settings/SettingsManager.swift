@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import Carbon.HIToolbox
 
 final class SettingsManager: ObservableObject {
     static let shared = SettingsManager()
@@ -7,6 +9,14 @@ final class SettingsManager: ObservableObject {
 
     @Published var triggerKey: TriggerKeyOption {
         didSet { defaults.set(triggerKey.rawValue, forKey: Keys.triggerKey) }
+    }
+
+    @Published var customTriggerKeyCode: Int {
+        didSet { defaults.set(customTriggerKeyCode, forKey: Keys.customTriggerKeyCode) }
+    }
+
+    @Published var customTriggerModifiers: UInt {
+        didSet { defaults.set(customTriggerModifiers, forKey: Keys.customTriggerModifiers) }
     }
 
     @Published var selectedMicrophoneID: Int {
@@ -45,6 +55,10 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(transformSelectedText, forKey: Keys.transformSelected) }
     }
 
+    @Published var selectedTransformModel: String {
+        didSet { defaults.set(selectedTransformModel, forKey: Keys.transformModel) }
+    }
+
     @Published var autoPaste: Bool {
         didSet { defaults.set(autoPaste, forKey: Keys.autoPaste) }
     }
@@ -63,6 +77,8 @@ final class SettingsManager: ObservableObject {
 
     private init() {
         self.triggerKey = TriggerKeyOption(rawValue: defaults.string(forKey: Keys.triggerKey) ?? "") ?? .rightOption
+        self.customTriggerKeyCode = defaults.object(forKey: Keys.customTriggerKeyCode) as? Int ?? Int(kVK_ANSI_D)
+        self.customTriggerModifiers = defaults.object(forKey: Keys.customTriggerModifiers) as? UInt ?? NSEvent.ModifierFlags([.command, .option]).rawValue
         self.selectedMicrophoneID = defaults.integer(forKey: Keys.microphoneID)
         self.selectedModel = ModelOption(rawValue: defaults.string(forKey: Keys.model) ?? "") ?? .parakeetV3
         self.transcriptionLanguage = LanguageOption(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .autoDetect
@@ -72,6 +88,7 @@ final class SettingsManager: ObservableObject {
         self.autoPunctuation = defaults.object(forKey: Keys.autoPunctuation) as? Bool ?? false
         self.bulletPoints = defaults.object(forKey: Keys.bulletPoints) as? Bool ?? true
         self.transformSelectedText = defaults.object(forKey: Keys.transformSelected) as? Bool ?? true
+        self.selectedTransformModel = defaults.string(forKey: Keys.transformModel) ?? "qwen3.5:2b"
         self.autoPaste = defaults.object(forKey: Keys.autoPaste) as? Bool ?? true
         self.copyToClipboard = defaults.object(forKey: Keys.copyClipboard) as? Bool ?? true
         self.autoSend = defaults.object(forKey: Keys.autoSend) as? Bool ?? false
@@ -80,6 +97,8 @@ final class SettingsManager: ObservableObject {
 
     private enum Keys {
         static let triggerKey = "triggerKey"
+        static let customTriggerKeyCode = "customTriggerKeyCode"
+        static let customTriggerModifiers = "customTriggerModifiers"
         static let microphoneID = "microphoneID"
         static let model = "model"
         static let language = "language"
@@ -89,10 +108,39 @@ final class SettingsManager: ObservableObject {
         static let autoPunctuation = "autoPunctuation"
         static let bulletPoints = "bulletPoints"
         static let transformSelected = "transformSelected"
+        static let transformModel = "transformModel"
         static let autoPaste = "autoPaste"
         static let copyClipboard = "copyToClipboard"
         static let autoSend = "autoSend"
         static let launchAtLogin = "launchAtLogin"
+    }
+}
+
+extension SettingsManager {
+    var triggerConfiguration: TriggerConfiguration {
+        switch triggerKey {
+        case .rightOption:
+            return TriggerConfiguration(
+                mode: .modifierOnly,
+                keyCode: Int(kVK_RightOption),
+                modifiers: [.option],
+                displayName: "Right Option"
+            )
+        case .fnGlobe:
+            return TriggerConfiguration(
+                mode: .modifierOnly,
+                keyCode: Int(kVK_Function),
+                modifiers: [.function],
+                displayName: "Fn / Globe"
+            )
+        case .custom:
+            return TriggerConfiguration(
+                mode: .keyCombo,
+                keyCode: customTriggerKeyCode,
+                modifiers: NSEvent.ModifierFlags(rawValue: customTriggerModifiers),
+                displayName: ShortcutFormatter.displayName(forKeyCode: customTriggerKeyCode, modifiers: NSEvent.ModifierFlags(rawValue: customTriggerModifiers))
+            )
+        }
     }
 }
 
@@ -106,6 +154,98 @@ enum TriggerKeyOption: String, CaseIterable {
         case .rightOption: return "Right Option (default)"
         case .fnGlobe: return "FN / Globe"
         case .custom: return "Custom..."
+        }
+    }
+}
+
+struct TriggerConfiguration: Equatable {
+    enum Mode: Equatable {
+        case modifierOnly
+        case keyCombo
+    }
+
+    let mode: Mode
+    let keyCode: Int
+    let modifiers: NSEvent.ModifierFlags
+    let displayName: String
+}
+
+enum ShortcutFormatter {
+    static func displayName(forKeyCode keyCode: Int, modifiers: NSEvent.ModifierFlags) -> String {
+        let modifierString = symbols(for: modifiers)
+        let keyString = specialKeyName(forKeyCode: keyCode) ?? characterName(forKeyCode: keyCode)
+        return modifierString.isEmpty ? keyString : "\(modifierString)\(keyString)"
+    }
+
+    static func symbols(for modifiers: NSEvent.ModifierFlags) -> String {
+        var result = ""
+        if modifiers.contains(.control) { result += "^" }
+        if modifiers.contains(.option) { result += "⌥" }
+        if modifiers.contains(.shift) { result += "⇧" }
+        if modifiers.contains(.command) { result += "⌘" }
+        if modifiers.contains(.function) { result += "fn " }
+        return result
+    }
+
+    private static func specialKeyName(forKeyCode keyCode: Int) -> String? {
+        switch keyCode {
+        case Int(kVK_RightOption): return "Right Option"
+        case Int(kVK_Function): return "Fn"
+        case Int(kVK_Space): return "Space"
+        case Int(kVK_Return): return "Return"
+        case Int(kVK_Tab): return "Tab"
+        case Int(kVK_Delete): return "Delete"
+        case Int(kVK_Escape): return "Esc"
+        default: return nil
+        }
+    }
+
+    private static func characterName(forKeyCode keyCode: Int) -> String {
+        if let scalar = keyCodeToASCII(keyCode) {
+            return String(scalar).uppercased()
+        }
+        return "Key \(keyCode)"
+    }
+
+    private static func keyCodeToASCII(_ keyCode: Int) -> Character? {
+        switch keyCode {
+        case Int(kVK_ANSI_A): return "a"
+        case Int(kVK_ANSI_B): return "b"
+        case Int(kVK_ANSI_C): return "c"
+        case Int(kVK_ANSI_D): return "d"
+        case Int(kVK_ANSI_E): return "e"
+        case Int(kVK_ANSI_F): return "f"
+        case Int(kVK_ANSI_G): return "g"
+        case Int(kVK_ANSI_H): return "h"
+        case Int(kVK_ANSI_I): return "i"
+        case Int(kVK_ANSI_J): return "j"
+        case Int(kVK_ANSI_K): return "k"
+        case Int(kVK_ANSI_L): return "l"
+        case Int(kVK_ANSI_M): return "m"
+        case Int(kVK_ANSI_N): return "n"
+        case Int(kVK_ANSI_O): return "o"
+        case Int(kVK_ANSI_P): return "p"
+        case Int(kVK_ANSI_Q): return "q"
+        case Int(kVK_ANSI_R): return "r"
+        case Int(kVK_ANSI_S): return "s"
+        case Int(kVK_ANSI_T): return "t"
+        case Int(kVK_ANSI_U): return "u"
+        case Int(kVK_ANSI_V): return "v"
+        case Int(kVK_ANSI_W): return "w"
+        case Int(kVK_ANSI_X): return "x"
+        case Int(kVK_ANSI_Y): return "y"
+        case Int(kVK_ANSI_Z): return "z"
+        case Int(kVK_ANSI_0): return "0"
+        case Int(kVK_ANSI_1): return "1"
+        case Int(kVK_ANSI_2): return "2"
+        case Int(kVK_ANSI_3): return "3"
+        case Int(kVK_ANSI_4): return "4"
+        case Int(kVK_ANSI_5): return "5"
+        case Int(kVK_ANSI_6): return "6"
+        case Int(kVK_ANSI_7): return "7"
+        case Int(kVK_ANSI_8): return "8"
+        case Int(kVK_ANSI_9): return "9"
+        default: return nil
         }
     }
 }

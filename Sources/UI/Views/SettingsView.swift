@@ -2,6 +2,10 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var settings = SettingsManager.shared
+    @State private var isCapturingShortcut = false
+    @State private var captureMonitor: Any?
+    @State private var captureMessage = "Press the key combination you want to use."
+    @State private var audioDevices: [AudioDeviceInfo] = [AudioDeviceInfo(id: 0, name: "System Default", isDefault: true)]
 
     var body: some View {
         ScrollView {
@@ -16,6 +20,30 @@ struct SettingsView: View {
             .padding(32)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .sheet(isPresented: $isCapturingShortcut, onDismiss: removeCaptureMonitor) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Capture Shortcut")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text(captureMessage)
+                    .foregroundColor(.secondary)
+
+                Text("Example: ⌘⌥D")
+                    .font(.system(.body, design: .monospaced))
+
+                HStack {
+                    Spacer()
+                    Button("Cancel") {
+                        isCapturingShortcut = false
+                    }
+                }
+            }
+            .padding(24)
+            .frame(width: 420)
+            .onAppear(perform: installCaptureMonitor)
+        }
+        .onAppear(perform: refreshAudioDevices)
     }
 
     private var headerSection: some View {
@@ -43,9 +71,31 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
+                if settings.triggerKey == .custom {
+                    HStack {
+                        Text("Current Shortcut")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(settings.triggerConfiguration.displayName)
+                            .font(.system(.body, design: .monospaced))
+                    }
+
+                    Button(isCapturingShortcut ? "Capturing..." : "Change Shortcut") {
+                        captureMessage = "Press the key combination you want to use."
+                        isCapturingShortcut = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
                 Text("Hold the trigger key to record. Release to transcribe.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                if settings.triggerKey == .custom {
+                    Text("Custom trigger must include at least one modifier key such as Command, Option, Control, or Shift.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
     }
@@ -64,9 +114,15 @@ struct SettingsView: View {
                 }
 
                 Picker("", selection: $settings.selectedMicrophoneID) {
-                    Text("System Default").tag(0)
+                    ForEach(audioDevices, id: \.id) { device in
+                        Text(device.name).tag(device.id)
+                    }
                 }
                 .pickerStyle(.menu)
+
+                Text("Active input: \(currentAudioDeviceName)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
                 Text("Select the microphone to use for dictation")
                     .font(.caption)
@@ -170,6 +226,49 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private func installCaptureMonitor() {
+        removeCaptureMonitor()
+        captureMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let modifiers = event.modifierFlags.intersection([.command, .option, .shift, .control, .function])
+
+            guard !modifiers.isEmpty else {
+                captureMessage = "Shortcut must include at least one modifier key."
+                return nil
+            }
+
+            let keyCode = Int(event.keyCode)
+            settings.customTriggerKeyCode = keyCode
+            settings.customTriggerModifiers = modifiers.rawValue
+            settings.triggerKey = .custom
+            captureMessage = "Saved \(ShortcutFormatter.displayName(forKeyCode: keyCode, modifiers: modifiers))"
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                isCapturingShortcut = false
+            }
+
+            return nil
+        }
+    }
+
+    private func removeCaptureMonitor() {
+        if let captureMonitor {
+            NSEvent.removeMonitor(captureMonitor)
+            self.captureMonitor = nil
+        }
+    }
+
+    private func refreshAudioDevices() {
+        audioDevices = [AudioDeviceInfo(id: 0, name: "System Default", isDefault: true)]
+        let devices = AudioCaptureManager.listAudioDevices()
+        for device in devices where device.hasInput {
+            audioDevices.append(AudioDeviceInfo(id: Int(device.id), name: device.name, isDefault: false))
+        }
+    }
+
+    private var currentAudioDeviceName: String {
+        audioDevices.first(where: { $0.id == settings.selectedMicrophoneID })?.name ?? "System Default"
     }
 }
 

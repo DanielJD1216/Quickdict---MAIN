@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import ApplicationServices
 import AVFoundation
+import Combine
 
 class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
     var mainWindow: NSWindow?
@@ -9,6 +10,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
     var recordingIndicator: RecordingIndicatorWindow?
     let appStatus = AppStatusCenter.shared
     private var timedStopWorkItem: DispatchWorkItem?
+    private var cancellables = Set<AnyCancellable>()
+    private var currentTargetContext: DictationTargetContext?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         checkAccessibilityPermissions()
@@ -191,6 +194,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
             return
         }
 
+        currentTargetContext = OutputManager.shared.captureTargetContext(includeSelectedText: SettingsManager.shared.transformSelectedText)
         appStatus.dictationState = .recording
         appStatus.setOutputMessage("Listening...")
         showIndicator(.recording)
@@ -215,8 +219,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
         HotkeyManager.shared.onTriggerReleased = { [weak self] in
             self?.stopDictation()
         }
-        HotkeyManager.shared.register(trigger: SettingsManager.shared.triggerKey)
+        HotkeyManager.shared.register(trigger: SettingsManager.shared.triggerConfiguration)
+        observeTriggerSettings()
         print("[AppDelegate] Hotkey registered")
+    }
+
+    private func observeTriggerSettings() {
+        let settings = SettingsManager.shared
+
+        Publishers.CombineLatest3(settings.$triggerKey, settings.$customTriggerKeyCode, settings.$customTriggerModifiers)
+            .receive(on: RunLoop.main)
+            .sink { _, _, _ in
+                HotkeyManager.shared.register(trigger: settings.triggerConfiguration)
+            }
+            .store(in: &cancellables)
+
+        settings.$selectedModel
+            .receive(on: RunLoop.main)
+            .sink { _ in
+                self.syncASRStatus()
+            }
+            .store(in: &cancellables)
     }
 
     private func showIndicator(_ state: RecordingIndicatorState) {
@@ -259,7 +282,42 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
 
     func audioCapture(_ manager: AudioCaptureManager, didFinishWithText text: String) {
         let processedText = pipeline().process(text)
-        OutputManager.shared.output(text: processedText, settings: SettingsManager.shared)
+        let settings = SettingsManager.shared
+        let targetContext = currentTargetContext
+        currentTargetContext = nil
+
+        if settings.transformSelectedText,
+           let selectedText = targetContext?.selectedText,
+           !selectedText.isEmpty {
+            appStatus.dictationState = .processing
+            appStatus.lastTranscript = "Transforming selected text..."
+            appStatus.setOutputMessage("Running transform request...")
+            appStatus.setTransformDebug("Using model \(settings.selectedTransformModel) on \(selectedText.count) chars")
+
+            Task {
+                do {
+                    let transformed = try await TransformManager.shared.transform(text: selectedText, command: processedText)
+                    await MainActor.run {
+                        self.appStatus.setTransformDebug("Transform succeeded, output \(transformed.count) chars")
+                        OutputManager.shared.output(text: transformed, settings: settings, target: targetContext)
+                        HotkeyManager.shared.stopRecording()
+                        self.appStatus.lastTranscript = transformed
+                        self.appStatus.dictationState = .done
+                        self.appStatus.setOutputMessage("Transformed selected text")
+                        self.recordingIndicator?.apply(state: .done)
+                        self.hideIndicator(after: 0.7)
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.appStatus.setTransformDebug("Transform failed: \(error.localizedDescription)")
+                        self.audioCapture(manager, didEncounterError: error)
+                    }
+                }
+            }
+            return
+        }
+
+        OutputManager.shared.output(text: processedText, settings: settings, target: targetContext)
         HotkeyManager.shared.stopRecording()
         appStatus.lastTranscript = processedText
         appStatus.dictationState = .done
@@ -270,6 +328,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
     }
 
     func audioCapture(_ manager: AudioCaptureManager, didEncounterError error: Error) {
+        currentTargetContext = nil
         HotkeyManager.shared.stopRecording()
         appStatus.dictationState = .error(error.localizedDescription)
         appStatus.lastTranscript = error.localizedDescription

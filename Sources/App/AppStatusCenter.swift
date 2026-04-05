@@ -74,6 +74,7 @@ final class AppStatusCenter: ObservableObject {
     @Published var audioLevel: Float = 0
     @Published var speechDetected = false
     @Published var lastAsrLatency: Double = 0
+    @Published var transformDebug = ""
 
     private init() {}
 
@@ -111,5 +112,9 @@ final class AppStatusCenter: ObservableObject {
 
     func setAsrLatency(_ latency: Double) {
         lastAsrLatency = latency
+    }
+
+    func setTransformDebug(_ message: String) {
+        transformDebug = message
     }
 }

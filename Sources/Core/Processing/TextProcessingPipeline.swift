@@ -102,6 +102,17 @@ struct FalseStartDetector {
 }
 
 struct InverseTextNormalizer {
+    private static let baseNumbers: [String: Int] = [
+        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+        "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+        "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+        "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+        "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+        "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90
+    ]
+    private static let multipliers: [String: Int] = ["hundred": 100, "thousand": 1000, "million": 1_000_000]
+    private static let ignorableWords: Set<String> = ["and"]
+
     static func process(_ text: String) -> String {
         var result = text
 
@@ -114,38 +125,34 @@ struct InverseTextNormalizer {
     }
 
     private static func normalizeNumbers(_ text: String) -> String {
-        let numberWords = [
-            "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-            "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
-            "seventeen", "eighteen", "nineteen", "twenty", "thirty", "forty", "fifty",
-            "sixty", "seventy", "eighty", "ninety", "hundred", "thousand", "million"
-        ]
+        let tokens = text.split(separator: " ").map(String.init)
+        var output: [String] = []
+        var index = 0
 
-        var result = text
-        let pattern = numberWords.joined(separator: "|")
-
-        guard let regex = try? NSRegularExpression(pattern: "\\b(\(pattern))\\b", options: .caseInsensitive) else {
-            return result
+        while index < tokens.count {
+            if let parsed = parseNumberPhrase(tokens, start: index) {
+                output.append(String(parsed.value))
+                index += parsed.consumed
+            } else {
+                output.append(tokens[index])
+                index += 1
+            }
         }
 
-        let range = NSRange(result.startIndex..., in: result)
-        result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "[number]")
-
-        return result
+        return output.joined(separator: " ")
     }
 
     private static func normalizeCurrency(_ text: String) -> String {
         var result = text
-
-        let currencyPatterns: [(pattern: String, replacement: String)] = [
-            ("\\bdollars?\\b", "$"),
-            ("\\bcents?\\b", "¢")
+        let patterns: [(String, String)] = [
+            ("\\b(\\d+)\\s+dollars?\\b", "$$$1"),
+            ("\\b(\\d+)\\s+cents?\\b", "$1¢")
         ]
 
-        for (pattern, replacement) in currencyPatterns {
+        for (pattern, template) in patterns {
             if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
                 let range = NSRange(result.startIndex..., in: result)
-                result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: replacement)
+                result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: template)
             }
         }
 
@@ -159,12 +166,56 @@ struct InverseTextNormalizer {
     private static func normalizePercentages(_ text: String) -> String {
         var result = text
 
-        if let regex = try? NSRegularExpression(pattern: "\\b(\\w+)\\s*percent\\b", options: .caseInsensitive) {
+        if let regex = try? NSRegularExpression(pattern: "\\b(\\d+)\\s*percent\\b", options: .caseInsensitive) {
             let range = NSRange(result.startIndex..., in: result)
             result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "$1%")
         }
 
         return result
+    }
+
+    private static func parseNumberPhrase(_ tokens: [String], start: Int) -> (value: Int, consumed: Int)? {
+        var index = start
+        var current = 0
+        var total = 0
+        var consumed = 0
+
+        while index < tokens.count {
+            let cleaned = normalizedToken(tokens[index])
+            if cleaned.isEmpty {
+                break
+            }
+            if ignorableWords.contains(cleaned) {
+                index += 1
+                consumed += 1
+                continue
+            }
+            if let base = baseNumbers[cleaned] {
+                current += base
+                index += 1
+                consumed += 1
+                continue
+            }
+            if let multiplier = multipliers[cleaned] {
+                if current == 0 { current = 1 }
+                current *= multiplier
+                if multiplier >= 1000 {
+                    total += current
+                    current = 0
+                }
+                index += 1
+                consumed += 1
+                continue
+            }
+            break
+        }
+
+        guard consumed > 0 else { return nil }
+        return (total + current, consumed)
+    }
+
+    private static func normalizedToken(_ token: String) -> String {
+        token.lowercased().trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines))
     }
 }
 
@@ -187,15 +238,51 @@ struct BulletFormatter {
     ]
 
     static func process(_ text: String) -> String {
-        var result = text
         let lowercased = text.lowercased()
 
-        for trigger in bulletTriggers {
-            if lowercased.contains(trigger) {
-                result = result.replacingOccurrences(of: trigger, with: "•", options: .caseInsensitive)
+        if bulletTriggers.contains(where: { lowercased.contains($0) }) {
+            let pattern = "(?i)(?:^|\\s)(?:next bullet|new bullet|bullet point|bullet)\\s+"
+            if let regex = try? NSRegularExpression(pattern: pattern) {
+                let nsRange = NSRange(text.startIndex..., in: text)
+                let matches = regex.matches(in: text, range: nsRange)
+                guard !matches.isEmpty else { return text }
+
+                var items: [String] = []
+                for (index, match) in matches.enumerated() {
+                    let itemStart = match.range.upperBound
+                    let itemEnd = index + 1 < matches.count ? matches[index + 1].range.location : (text as NSString).length
+                    let range = NSRange(location: itemStart, length: itemEnd - itemStart)
+                    let item = (text as NSString).substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !item.isEmpty {
+                        items.append("• \(item)")
+                    }
+                }
+                if !items.isEmpty {
+                    return items.joined(separator: "\n")
+                }
             }
         }
 
-        return result
+        let numberedPattern = "(?:^|\\s)(?:\\d+|zero|oh)[\\.\\)]?\\s+(.+?)(?=(?:\\s+(?:\\d+|zero|oh)[\\.\\)]?\\s+)|$)"
+        if let regex = try? NSRegularExpression(pattern: numberedPattern) {
+            let nsRange = NSRange(text.startIndex..., in: text)
+            let matches = regex.matches(in: text, range: nsRange)
+            if matches.count >= 2 {
+                let firstMatchLocation = matches[0].range.location
+                let prefix = (text as NSString).substring(to: firstMatchLocation).trimmingCharacters(in: .whitespacesAndNewlines)
+                let items = matches.compactMap { match -> String? in
+                    guard match.numberOfRanges >= 2 else { return nil }
+                    let item = (text as NSString).substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !item.isEmpty else { return nil }
+                    let cleaned = item.replacingOccurrences(of: "^and\\s+", with: "", options: .regularExpression)
+                    guard !cleaned.isEmpty else { return nil }
+                    return "• \(cleaned.prefix(1).uppercased())\(cleaned.dropFirst())"
+                }
+                let listBody = items.joined(separator: "\n")
+                return prefix.isEmpty ? listBody : "\(prefix)\n\(listBody)"
+            }
+        }
+
+        return text
     }
 }

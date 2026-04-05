@@ -22,10 +22,10 @@ final class AudioCaptureManager: NSObject {
 
     private var isRecording = false
     private var vad: VoiceActivityDetector?
-    private var asrEngine: ASREngine?
-    private var audioConverter: AVAudioConverter?
+    private let asrEngine = ASREngine.shared
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)
     private var detectedSpeech = false
+    private var rawSampleRate: Double = 0
 
     private let sampleRate: Double = 16000
     private let bufferSize: AVAudioFrameCount = 512
@@ -41,8 +41,8 @@ final class AudioCaptureManager: NSObject {
 
         audioBuffer.removeAll()
         detectedSpeech = false
+        rawSampleRate = 0
         vad = VoiceActivityDetector()
-        asrEngine = ASREngine()
 
         audioEngine = AVAudioEngine()
         guard let engine = audioEngine else {
@@ -52,7 +52,7 @@ final class AudioCaptureManager: NSObject {
 
         inputNode = engine.inputNode
         let format = inputNode!.outputFormat(forBus: 0)
-        audioConverter = AVAudioConverter(from: format, to: targetFormat!)
+        rawSampleRate = format.sampleRate
 
         print("[AudioCapture] Input format: \(format)")
         print("[AudioCapture] Sample rate: \(format.sampleRate), channels: \(format.channelCount)")
@@ -83,24 +83,33 @@ final class AudioCaptureManager: NSObject {
         isRecording = false
 
         bufferLock.lock()
-        let finalBuffer = audioBuffer
+        let finalRawBuffer = audioBuffer
         bufferLock.unlock()
 
-        let finalLevel = rms(finalBuffer)
+        let finalRawLevel = rms(finalRawBuffer)
 
-        Task { @MainActor in
-            AppStatusCenter.shared.setAudioDiagnostics(rawInputSampleRate: AppStatusCenter.shared.rawInputSampleRate, rawAudioLevel: AppStatusCenter.shared.rawAudioLevel, inputSampleRate: self.sampleRate, capturedSamples: finalBuffer.count, audioLevel: finalLevel, speechDetected: self.detectedSpeech)
-        }
+        print("[AudioCapture] Recording stopped with \(finalRawBuffer.count) raw samples at \(Int(rawSampleRate))Hz")
 
-        print("[AudioCapture] Recording stopped, processing \(finalBuffer.count) samples...")
-
-        if finalLevel < 0.001 {
+        if finalRawLevel < 0.001 {
             delegate?.audioCapture(self, didEncounterError: AudioCaptureError.noAudioDetected)
             return
         }
 
+        guard let convertedBuffer = convertSessionToTargetSamples(finalRawBuffer), !convertedBuffer.isEmpty else {
+            delegate?.audioCapture(self, didEncounterError: AudioCaptureError.transcriptionFailed)
+            return
+        }
+
+        let finalConvertedLevel = rms(convertedBuffer)
+
+        Task { @MainActor in
+            AppStatusCenter.shared.setAudioDiagnostics(rawInputSampleRate: self.rawSampleRate, rawAudioLevel: finalRawLevel, inputSampleRate: self.sampleRate, capturedSamples: convertedBuffer.count, audioLevel: finalConvertedLevel, speechDetected: self.detectedSpeech)
+        }
+
+        print("[AudioCapture] Recording stopped, processing \(convertedBuffer.count) converted samples...")
+
         Task {
-            await transcribe(buffer: finalBuffer)
+            await transcribe(buffer: convertedBuffer)
         }
     }
 
@@ -109,13 +118,12 @@ final class AudioCaptureManager: NSObject {
     }
 
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
-        let rawLevel = rms(from: buffer)
-        guard let samples = convertToTargetSamples(buffer) else { return }
+        guard let rawSamples = extractMonoFloatSamples(from: buffer) else { return }
 
-        let level = rms(samples)
+        let rawLevel = rms(rawSamples)
 
         if let vad = vad {
-            let isSpeech = vad.detect(samples: samples)
+            let isSpeech = vad.detect(samples: rawSamples)
             if isSpeech {
                 detectedSpeech = true
                 delegate?.audioCapture(self, didDetectSpeech: true)
@@ -123,25 +131,25 @@ final class AudioCaptureManager: NSObject {
         }
 
         bufferLock.lock()
-        audioBuffer.append(contentsOf: samples)
-        let totalSamples = audioBuffer.count
+        audioBuffer.append(contentsOf: rawSamples)
+        let totalRawSamples = audioBuffer.count
         bufferLock.unlock()
 
+        let estimatedConvertedSamples = rawSampleRate > 0 ? Int(Double(totalRawSamples) * (sampleRate / rawSampleRate)) : 0
+
         Task { @MainActor in
-            AppStatusCenter.shared.setAudioDiagnostics(rawInputSampleRate: buffer.format.sampleRate, rawAudioLevel: rawLevel, inputSampleRate: self.sampleRate, capturedSamples: totalSamples, audioLevel: level, speechDetected: self.detectedSpeech)
+            AppStatusCenter.shared.setAudioDiagnostics(rawInputSampleRate: buffer.format.sampleRate, rawAudioLevel: rawLevel, inputSampleRate: self.sampleRate, capturedSamples: estimatedConvertedSamples, audioLevel: rawLevel, speechDetected: self.detectedSpeech)
         }
 
         delegate?.audioCapture(self, didCaptureBuffer: buffer)
     }
 
     private func transcribe(buffer: [Float]) async {
-        guard let engine = asrEngine else { return }
-
         let startTime = CFAbsoluteTimeGetCurrent()
         print("[AudioCapture] Sending \(buffer.count) resampled samples to ASR")
 
         do {
-            let text = try await engine.transcribe(samples: buffer, sampleRate: Int(sampleRate))
+            let text = try await asrEngine.transcribe(samples: buffer, sampleRate: Int(sampleRate))
             let latency = CFAbsoluteTimeGetCurrent() - startTime
             print("[AudioCapture] Transcription complete in \(String(format: "%.3f", latency))s: \"\(text)\"")
 
@@ -157,22 +165,28 @@ final class AudioCaptureManager: NSObject {
         }
     }
 
-    private func convertToTargetSamples(_ buffer: AVAudioPCMBuffer) -> [Float]? {
+    private func convertSessionToTargetSamples(_ rawSamples: [Float]) -> [Float]? {
         guard let targetFormat else { return nil }
-        guard let converter = audioConverter else {
-            return extractFloatSamples(from: buffer)
+        guard rawSampleRate > 0 else { return nil }
+
+        let sourceFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rawSampleRate, channels: 1, interleaved: false)
+        guard let sourceFormat else { return nil }
+        guard let sourceBuffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: AVAudioFrameCount(rawSamples.count)) else { return nil }
+
+        sourceBuffer.frameLength = AVAudioFrameCount(rawSamples.count)
+        guard let sourceChannel = sourceBuffer.floatChannelData?[0] else { return nil }
+        rawSamples.withUnsafeBufferPointer { pointer in
+            sourceChannel.assign(from: pointer.baseAddress!, count: rawSamples.count)
         }
 
-        let ratio = targetFormat.sampleRate / buffer.format.sampleRate
-        let estimatedFrames = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 32
+        let ratio = targetFormat.sampleRate / sourceFormat.sampleRate
+        let estimatedFrames = AVAudioFrameCount((Double(rawSamples.count) * ratio).rounded(.up)) + 64
+        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: estimatedFrames) else { return nil }
 
-        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: estimatedFrames) else {
-            return nil
-        }
+        guard let converter = AVAudioConverter(from: sourceFormat, to: targetFormat) else { return nil }
 
         var error: NSError?
         var didProvideInput = false
-
         let status = converter.convert(to: outputBuffer, error: &error) { _, outStatus in
             if didProvideInput {
                 outStatus.pointee = .endOfStream
@@ -181,25 +195,61 @@ final class AudioCaptureManager: NSObject {
 
             didProvideInput = true
             outStatus.pointee = .haveData
-            return buffer
+            return sourceBuffer
         }
 
         if let error {
-            print("[AudioCapture] Conversion error: \(error)")
+            print("[AudioCapture] Session conversion error: \(error)")
             return nil
         }
 
         switch status {
         case .haveData, .inputRanDry, .endOfStream:
-            break
+            return extractFloatSamples(from: outputBuffer)
         case .error:
-            print("[AudioCapture] Converter returned error status")
+            print("[AudioCapture] Session converter returned error status")
             return nil
         @unknown default:
             return nil
         }
+    }
 
-        return extractFloatSamples(from: outputBuffer)
+    private func extractMonoFloatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
+        let frameLength = Int(buffer.frameLength)
+        guard frameLength > 0 else { return [] }
+
+        switch buffer.format.commonFormat {
+        case .pcmFormatFloat32:
+            guard let channelData = buffer.floatChannelData else { return nil }
+            return downmixToMono(channelCount: Int(buffer.format.channelCount), frameLength: frameLength) { channel, index in
+                channelData[channel][index]
+            }
+        case .pcmFormatInt16:
+            guard let channelData = buffer.int16ChannelData else { return nil }
+            return downmixToMono(channelCount: Int(buffer.format.channelCount), frameLength: frameLength) { channel, index in
+                Float(channelData[channel][index]) / Float(Int16.max)
+            }
+        case .pcmFormatInt32:
+            guard let channelData = buffer.int32ChannelData else { return nil }
+            return downmixToMono(channelCount: Int(buffer.format.channelCount), frameLength: frameLength) { channel, index in
+                Float(channelData[channel][index]) / Float(Int32.max)
+            }
+        default:
+            return nil
+        }
+    }
+
+    private func downmixToMono(channelCount: Int, frameLength: Int, sampleAt: (Int, Int) -> Float) -> [Float] {
+        let safeChannelCount = max(1, channelCount)
+        var mono = [Float](repeating: 0, count: frameLength)
+        for frame in 0..<frameLength {
+            var sum: Float = 0
+            for channel in 0..<safeChannelCount {
+                sum += sampleAt(channel, frame)
+            }
+            mono[frame] = sum / Float(safeChannelCount)
+        }
+        return mono
     }
 
     private func extractFloatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
