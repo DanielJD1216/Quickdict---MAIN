@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-check:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve Swift packages
+        run: xcodebuild -resolvePackageDependencies -project Quickdict.xcodeproj -scheme Quickdict
+
+      - name: Build
+        run: xcodebuild -project Quickdict.xcodeproj -scheme Quickdict -configuration Debug -derivedDataPath ./build CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
+
+      - name: Build processing checks
+        run: xcodebuild -project Quickdict.xcodeproj -scheme QuickdictProcessingChecks -configuration Debug -derivedDataPath ./build-checks build
+
+      - name: Run processing checks
+        run: ./build-checks/Build/Products/Debug/QuickdictProcessingChecks

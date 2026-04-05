@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible problem in Quickdict
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List exact steps
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include macOS version, Mac model, selected ASR model, selected transform model, and permission state.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics / screenshots
+      description: Paste any relevant diagnostics or screenshots.

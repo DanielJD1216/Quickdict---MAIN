@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		010BADE38C8345D8373488E4 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A37FDDAE610DBE6008E48F /* MainWindow.swift */; };
+		1170DEDB26B809EE98A58C14 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 730DCE46568097C5F9C02FB8 /* main.swift */; };
 		1539FF7901457E6F20E206EF /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F462CE13C704F8688F526928 /* AudioCaptureManager.swift */; };
 		15C011AD7F4E479C4E407A4B /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 746221E966E7BC198B883B0B /* DashboardView.swift */; };
 		1F942F3280EFAA992A8D9D59 /* RecordingIndicatorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D537DFE580BC91751A7113F /* RecordingIndicatorWindow.swift */; };
@@ -19,6 +20,7 @@
 		689171CA84D5713F4CEB6C60 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D74C2EDCA0244AD2CCAD194 /* AppCommands.swift */; };
 		6E8919589DC812734553C814 /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51178442231A49D33DAF633C /* SettingsViews.swift */; };
 		70FA5207E017D9211C9ECDE5 /* AppStatusCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33976C6DC4CE795D8AF7AAAB /* AppStatusCenter.swift */; };
+		80AD9CFBF3274EA14B061271 /* TextProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF2EBB5E7524BD833DE24CF6 /* TextProcessingPipeline.swift */; };
 		84EB053225F0F8B5C0449A37 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6766AF98E2E898DC9FE82A /* SettingsView.swift */; };
 		8EA8F624765F9072A3BC2769 /* TextProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF2EBB5E7524BD833DE24CF6 /* TextProcessingPipeline.swift */; };
 		9D600499F456B6A977DD5A4A /* ModelManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CEC1AF690214368390EE289 /* ModelManagementView.swift */; };
@@ -29,7 +31,6 @@
 		C1C3E08A176E3FCD28ABF9A6 /* VoiceActivityDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5936B9AAB421C6382B5A69F0 /* VoiceActivityDetector.swift */; };
 		E0E472610ECB09469006F0D1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BAE369F46CC7E2B40B9656E /* AppDelegate.swift */; };
 		EB8FDD4238BD51AE328FB504 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039DCFCC570CCFFAED991CA5 /* HotkeyManager.swift */; };
-		EF47D65332C276A29FFACF90 /* QuickdictTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FBB2CE25BD03AAD440D8BE9 /* QuickdictTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,12 +49,12 @@
 		0D74C2EDCA0244AD2CCAD194 /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
 		1751B614461BC0AE2ACBA81C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2990FF97E2B302D036B60B1E /* QuickdictTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = QuickdictTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		2FBB2CE25BD03AAD440D8BE9 /* QuickdictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickdictTests.swift; sourceTree = "<group>"; };
 		33976C6DC4CE795D8AF7AAAB /* AppStatusCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatusCenter.swift; sourceTree = "<group>"; };
 		51178442231A49D33DAF633C /* SettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViews.swift; sourceTree = "<group>"; };
 		5936B9AAB421C6382B5A69F0 /* VoiceActivityDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityDetector.swift; sourceTree = "<group>"; };
 		5BAE369F46CC7E2B40B9656E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		70BF7557091B95BD85F22D23 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		730DCE46568097C5F9C02FB8 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		746221E966E7BC198B883B0B /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		7C6766AF98E2E898DC9FE82A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8CEC1AF690214368390EE289 /* ModelManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagementView.swift; sourceTree = "<group>"; };
@@ -61,6 +62,7 @@
 		93886D94BA6147EDE19D264D /* DictationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationView.swift; sourceTree = "<group>"; };
 		C683AAFFB1CE883765F65008 /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
 		CE61F759F9EEF9361BB822ED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D3CF3254A380E01F420A91A6 /* QuickdictProcessingChecks */ = {isa = PBXFileReference; includeInIndex = 0; path = QuickdictProcessingChecks; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6699CDEF8AA47F4C50FD99E /* Quickdict.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quickdict.entitlements; sourceTree = "<group>"; };
 		DD819C1DEF4A87DF114A6FB6 /* Quickdict.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Quickdict.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E64160B0E81A03C6ECE3D82B /* OutputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputManager.swift; sourceTree = "<group>"; };
@@ -125,7 +127,6 @@
 		2300863E454E6B928C2D3D22 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				2FBB2CE25BD03AAD440D8BE9 /* QuickdictTests.swift */,
 				F9A970B4D9F44C380EE08A19 /* TextProcessingTests.swift */,
 			);
 			name = Sources;
@@ -174,6 +175,7 @@
 		77AFD5A45A2C70F9B9309A82 = {
 			isa = PBXGroup;
 			children = (
+				C4CE3F381333AA350745BCF8 /* ProcessingChecks */,
 				F14AB122EC56B2B58DCAC7F5 /* Resources */,
 				59F5099857B0695D61682E51 /* Sources */,
 				2300863E454E6B928C2D3D22 /* Sources */,
@@ -217,6 +219,15 @@
 			path = Audio;
 			sourceTree = "<group>";
 		};
+		C4CE3F381333AA350745BCF8 /* ProcessingChecks */ = {
+			isa = PBXGroup;
+			children = (
+				730DCE46568097C5F9C02FB8 /* main.swift */,
+			);
+			name = ProcessingChecks;
+			path = Tools/ProcessingChecks;
+			sourceTree = "<group>";
+		};
 		CA77F5136EA8DC35394B23A3 /* Hotkey */ = {
 			isa = PBXGroup;
 			children = (
@@ -229,6 +240,7 @@
 			isa = PBXGroup;
 			children = (
 				DD819C1DEF4A87DF114A6FB6 /* Quickdict.app */,
+				D3CF3254A380E01F420A91A6 /* QuickdictProcessingChecks */,
 				2990FF97E2B302D036B60B1E /* QuickdictTests.xctest */,
 			);
 			name = Products;
@@ -293,6 +305,23 @@
 			productReference = DD819C1DEF4A87DF114A6FB6 /* Quickdict.app */;
 			productType = "com.apple.product-type.application";
 		};
+		711AFF9927D08EDBB30F25E1 /* QuickdictProcessingChecks */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 41D5AB97BF6D8370FE7470D5 /* Build configuration list for PBXNativeTarget "QuickdictProcessingChecks" */;
+			buildPhases = (
+				04532FF06810B04710111C00 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QuickdictProcessingChecks;
+			packageProductDependencies = (
+			);
+			productName = QuickdictProcessingChecks;
+			productReference = D3CF3254A380E01F420A91A6 /* QuickdictProcessingChecks */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -322,6 +351,7 @@
 			projectRoot = "";
 			targets = (
 				515C17BA1F32E39E74721733 /* Quickdict */,
+				711AFF9927D08EDBB30F25E1 /* QuickdictProcessingChecks */,
 				4CCBCB4CEB730E76ADFC8385 /* QuickdictTests */,
 			);
 		};
@@ -339,6 +369,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		04532FF06810B04710111C00 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				80AD9CFBF3274EA14B061271 /* TextProcessingPipeline.swift in Sources */,
+				1170DEDB26B809EE98A58C14 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0AD465EFCD8AE3B759847BF6 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -369,7 +408,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EF47D65332C276A29FFACF90 /* QuickdictTests.swift in Sources */,
 				BB471E86101757E588A77F51 /* TextProcessingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -486,8 +524,24 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.quickdict.app.tests;
+				PRODUCT_MODULE_NAME = QuickdictTests;
+				PRODUCT_NAME = QuickdictTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Quickdict.app/Contents/MacOS/Quickdict";
+			};
+			name = Debug;
+		};
+		9CA211C893B31C02BF645FA0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quickdict.processing-checks";
+				PRODUCT_NAME = QuickdictProcessingChecks;
+				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
@@ -571,14 +625,39 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.quickdict.app.tests;
+				PRODUCT_MODULE_NAME = QuickdictTests;
+				PRODUCT_NAME = QuickdictTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Quickdict.app/Contents/MacOS/Quickdict";
+			};
+			name = Release;
+		};
+		FD1BFDF6878C291AD544E5CB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quickdict.processing-checks";
+				PRODUCT_NAME = QuickdictProcessingChecks;
+				SDKROOT = macosx;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		41D5AB97BF6D8370FE7470D5 /* Build configuration list for PBXNativeTarget "QuickdictProcessingChecks" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9CA211C893B31C02BF645FA0 /* Debug */,
+				FD1BFDF6878C291AD544E5CB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		5ADB6C548ABB55B729BF41C3 /* Build configuration list for PBXProject "Quickdict" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

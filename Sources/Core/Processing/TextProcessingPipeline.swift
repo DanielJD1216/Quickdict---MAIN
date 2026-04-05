@@ -74,6 +74,7 @@ struct FalseStartDetector {
 
                 if current == next ||
                    (current.hasSuffix(",") && words[i].dropLast().lowercased() == next) {
+                    result.append(words[i])
                     i += 2
                     continue
                 }
@@ -144,16 +145,20 @@ struct InverseTextNormalizer {
 
     private static func normalizeCurrency(_ text: String) -> String {
         var result = text
-        let patterns: [(String, String)] = [
-            ("\\b(\\d+)\\s+dollars?\\b", "$$$1"),
-            ("\\b(\\d+)\\s+cents?\\b", "$1¢")
-        ]
-
-        for (pattern, template) in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
-                let range = NSRange(result.startIndex..., in: result)
-                result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: template)
+        if let regex = try? NSRegularExpression(pattern: "\\b(\\d+)\\s+dollars?\\b", options: .caseInsensitive) {
+            let nsString = result as NSString
+            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result)).reversed()
+            var mutable = nsString
+            for match in matches {
+                let amount = nsString.substring(with: match.range(at: 1))
+                mutable = mutable.replacingCharacters(in: match.range, with: "$\(amount)") as NSString
             }
+            result = mutable as String
+        }
+
+        if let regex = try? NSRegularExpression(pattern: "\\b(\\d+)\\s+cents?\\b", options: .caseInsensitive) {
+            let range = NSRange(result.startIndex..., in: result)
+            result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "$1¢")
         }
 
         return result

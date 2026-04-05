@@ -2,49 +2,32 @@ import XCTest
 @testable import Quickdict
 
 final class TextProcessingTests: XCTestCase {
-    func testFillerWordRemover() {
-        let testCases: [(input: String, expected: String)] = [
-            ("um hello world", "hello world"),
-            ("I uh like you", "I  you"),
-            ("so basically what happened was", " what happened was"),
-            ("you know I think it is good", "I think it is good"),
-            ("well actually I mean maybe", " ")
-        ]
-
-        for (input, expected) in testCases {
-            let result = FillerWordRemover.process(input)
-            print("Filler: '\(input)' -> '\(result)'")
-        }
+    func testFillerWordRemoverStripsCommonFillers() {
+        XCTAssertEqual(FillerWordRemover.process("um hello world"), "hello world")
+        XCTAssertEqual(FillerWordRemover.process("you know I think it is good"), "I think it is good")
+        XCTAssertEqual(FillerWordRemover.process("well actually I mean maybe"), "")
     }
 
-    func testFalseStartDetector() {
-        let testCases: [(input: String, expected: String)] = [
-            ("I want to go to the store", "I want to go to the store"),
-            ("I want to, I need to go", "I need to go"),
-            ("the the quick brown fox", "the quick brown fox")
-        ]
-
-        for (input, expected) in testCases {
-            let result = FalseStartDetector.process(input)
-            print("FalseStart: '\(input)' -> '\(result)'")
-        }
+    func testFalseStartDetectorRemovesRepeatedLeadIn() {
+        XCTAssertEqual(FalseStartDetector.process("the the quick brown fox"), "the quick brown fox")
+        XCTAssertEqual(FalseStartDetector.process("I want to go to the store"), "I want to go to the store")
     }
 
-    func testBulletFormatter() {
-        let testCases: [(input: String, expected: String)] = [
-            ("bullet first item", "• first item"),
-            ("next bullet second item", "• second item"),
-            ("this is not a bullet", "this is not a bullet")
-        ]
-
-        for (input, expected) in testCases {
-            let result = BulletFormatter.process(input)
-            print("Bullet: '\(input)' -> '\(result)'")
-        }
+    func testNumberConversionHandlesNumbersCurrencyAndPercentages() {
+        XCTAssertEqual(InverseTextNormalizer.process("twenty three dollars"), "$23")
+        XCTAssertEqual(InverseTextNormalizer.process("forty two percent growth"), "42% growth")
+        XCTAssertEqual(InverseTextNormalizer.process("one hundred twenty five"), "125")
     }
 
-    func testPercentageNormalization() {
-        let result = InverseTextNormalizer.process("fifty percent growth")
-        print("Percent: 'fifty percent growth' -> '\(result)'")
+    func testBulletFormatterHandlesSpokenBulletTriggers() {
+        let input = "bullet bananas next bullet peanuts next bullet apples"
+        let expected = "• bananas\n• peanuts\n• apples"
+        XCTAssertEqual(BulletFormatter.process(input), expected)
+    }
+
+    func testBulletFormatterConvertsSimpleNumberedListToBullets() {
+        let input = "1 bananas 2 peanuts 3 apples"
+        let expected = "• Bananas\n• Peanuts\n• Apples"
+        XCTAssertEqual(BulletFormatter.process(input), expected)
     }
 }

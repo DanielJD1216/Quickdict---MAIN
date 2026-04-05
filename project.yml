@@ -62,8 +62,22 @@ targets:
       - target: Quickdict
     settings:
       base:
+        PRODUCT_NAME: QuickdictTests
+        PRODUCT_MODULE_NAME: QuickdictTests
         PRODUCT_BUNDLE_IDENTIFIER: com.quickdict.app.tests
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Quickdict.app/Contents/MacOS/Quickdict"
+
+  QuickdictProcessingChecks:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Tools/ProcessingChecks
+        excludes:
+          - "**/.DS_Store"
+      - path: Sources/Core/Processing/TextProcessingPipeline.swift
+    settings:
+      base:
+        PRODUCT_NAME: QuickdictProcessingChecks
+        PRODUCT_BUNDLE_IDENTIFIER: com.quickdict.processing-checks
 
 schemes:
   Quickdict:
@@ -76,6 +90,12 @@ schemes:
       config: Debug
       targets:
         - QuickdictTests
+  QuickdictProcessingChecks:
+    build:
+      targets:
+        QuickdictProcessingChecks: all
+    run:
+      config: Debug
     profile:
       config: Release
     analyze:

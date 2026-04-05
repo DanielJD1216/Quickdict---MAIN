@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "515C17BA1F32E39E74721733"
-               BuildableName = "Quickdict.app"
-               BlueprintName = "Quickdict"
+               BlueprintIdentifier = "711AFF9927D08EDBB30F25E1"
+               BuildableName = "QuickdictProcessingChecks"
+               BlueprintName = "QuickdictProcessingChecks"
                ReferencedContainer = "container:Quickdict.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -32,27 +32,14 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "515C17BA1F32E39E74721733"
-            BuildableName = "Quickdict.app"
-            BlueprintName = "Quickdict"
+            BlueprintIdentifier = "711AFF9927D08EDBB30F25E1"
+            BuildableName = "QuickdictProcessingChecks"
+            BlueprintName = "QuickdictProcessingChecks"
             ReferencedContainer = "container:Quickdict.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4CCBCB4CEB730E76ADFC8385"
-               BuildableName = "QuickdictTests.xctest"
-               BlueprintName = "QuickdictTests"
-               ReferencedContainer = "container:Quickdict.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -68,9 +55,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "515C17BA1F32E39E74721733"
-            BuildableName = "Quickdict.app"
-            BlueprintName = "Quickdict"
+            BlueprintIdentifier = "711AFF9927D08EDBB30F25E1"
+            BuildableName = "QuickdictProcessingChecks"
+            BlueprintName = "QuickdictProcessingChecks"
             ReferencedContainer = "container:Quickdict.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -87,12 +74,14 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "515C17BA1F32E39E74721733"
-            BuildableName = "Quickdict.app"
-            BlueprintName = "Quickdict"
+            BlueprintIdentifier = "711AFF9927D08EDBB30F25E1"
+            BuildableName = "QuickdictProcessingChecks"
+            BlueprintName = "QuickdictProcessingChecks"
             ReferencedContainer = "container:Quickdict.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <CommandLineArguments>
+      </CommandLineArguments>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">
