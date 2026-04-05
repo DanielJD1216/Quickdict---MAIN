@@ -1,169 +1,184 @@
 # Quickdict
 
-Local-First Voice Dictation for macOS
+Local-first voice dictation for macOS.
 
-## Features
+Quickdict is a native macOS app for system-wide dictation with local ASR models and optional local text transforms through Ollama.
 
-- **Hold-to-record dictation** - Press and hold Right Option to record, release to transcribe
-- **Lock mode** - Hold trigger and press Space for extended recording
-- **Text processing** - Automatic filler word removal, false start detection, number conversion
-- **Auto-paste** - Automatically paste transcribed text into any app
-- **Transform selected text** - Use voice commands to transform selected text (requires Ollama)
-- **Local-first** - All dictation runs on-device using Apple Neural Engine
+## What It Does
+
+- Hold-to-record dictation with a global trigger key
+- Local transcription with Parakeet v3 or Qwen3 ASR
+- Optional post-processing: filler removal, false-start cleanup, number conversion, bullet formatting
+- Output to clipboard and active app
+- Transform selected text with local Ollama models
 
 ## System Requirements
 
-- macOS 13.0 (Ventura) or later
-- Apple Silicon (M1/M2/M3/M4)
-- No internet required for core dictation
+- macOS 14 or later
+- Apple Silicon Mac
+- Microphone access
+- Accessibility access
+- Input Monitoring access
+- Internet only when downloading models
 
-## Installation
+## Install
 
-### Step 1: Mount the DMG
+### DMG Install
 
-Double-click `Quickdict-1.0.0.dmg` to mount it.
+1. Open `Quickdict-1.0.0.dmg`
+2. Drag `Quickdict.app` into `Applications`
+3. Open `Applications/Quickdict.app`
 
-### Step 2: Copy to Applications
+If macOS blocks the app the first time:
 
-Drag `Quickdict.app` to your Applications folder.
+1. Right-click `Quickdict.app`
+2. Click `Open`
+3. Confirm the warning dialog
 
-### Step 3: Open the App
+### Required Permissions
 
-Right-click on Quickdict.app and select "Open" (required for Gatekeeper bypass on unsigned apps).
+Enable Quickdict in:
 
-Alternatively, you can run:
+1. `System Settings > Privacy & Security > Accessibility`
+2. `System Settings > Privacy & Security > Input Monitoring`
+3. `System Settings > Privacy & Security > Microphone`
+
+If you change Accessibility or Input Monitoring, quit and relaunch Quickdict.
+
+## Models
+
+### ASR Models
+
+- `Parakeet v3`
+  - fastest dictation path
+  - English-focused
+- `Qwen3 ASR`
+  - multilingual
+  - slower than Parakeet
+  - prefers `int8` when available
+
+### Transform Models
+
+Transform models run through Ollama and are managed separately from ASR models.
+
+Recommended:
+
+- `Qwen 3.5 2B` for fastest transform response
+
+Optional:
+
+- `Qwen 3.5 4B`
+- `Qwen 3.5 9B`
+
+Quickdict can install these through the Models screen if Ollama is installed.
+
+## Ollama Setup
+
+If you want transform mode:
+
+1. Install Ollama
+
 ```bash
-xattr -cr /Applications/Quickdict.app
-open /Applications/Quickdict.app
+brew install ollama
 ```
 
-### Step 4: Grant Permissions
+2. Start Ollama
 
-The app will request two permissions:
+```bash
+ollama serve
+```
 
-1. **Microphone Permission** - Required for dictation
-   - System Settings → Privacy & Security → Microphone
-   - Enable Quickdict
-
-2. **Accessibility Permission** - Required for global hotkey and text insertion
-   - System Settings → Privacy & Security → Accessibility
-   - Enable Quickdict
-
-## Transform Feature (Optional)
-
-The transform feature lets you transform selected text using voice commands like:
-- "rewrite more formally"
-- "reformat as bullets"
-- "make it shorter"
-- "translate to Spanish"
-
-### Setup Transform Feature
-
-1. **Install Ollama**
-   ```bash
-   brew install ollama
-   ```
-
-2. **Pull Qwen 2.5 2B model**
-   ```bash
-   ollama pull qwen2.5:2b
-   ```
-
-3. **Start Ollama** (runs automatically on login if installed via Homebrew)
-   ```bash
-   ollama serve
-   ```
-
-4. Enable "Transform selected text" in Quickdict Settings
+3. In Quickdict, open `Models`
+4. Under `Transform Models`, install and select a Qwen 3.5 model
 
 ## Usage
 
-### Starting Dictation
+### Dictation
 
-1. Click the microphone icon in the menu bar
-2. Or hold **Right Option** (default trigger) in any app
-3. Speak your text
-4. Release to transcribe
+1. Open Quickdict
+2. Hold the trigger key or use the Dictation screen controls
+3. Speak
+4. Release the trigger to transcribe
 
-### Lock Mode
+### Transform Selected Text
 
-While holding the trigger key, press **Space** to lock recording for longer takes. Press the trigger again to stop.
+1. Select text in another app
+2. Make sure `Transform selected text` is enabled
+3. Dictate a command like:
+   - `rewrite more formally`
+   - `make this more humorous`
+   - `remove orange juice from this list`
+4. Quickdict will replace the selected text with the transformed version
 
-### Transform Mode
-
-1. Select text in any app
-2. Hold trigger and speak a command (e.g., "rewrite more formally")
-3. The selected text will be replaced with the transformed version
-
-### Settings
-
-Click the menu bar icon → Settings to configure:
-- Trigger key (Right Option, FN/Globe, or custom)
-- Microphone selection
-- ASR model (Parakeet v3 or Qwen3 ASR)
-- Text processing options
-- Output behavior (auto-paste, clipboard, auto-send)
-
-## Troubleshooting
-
-### App doesn't respond to hotkey
-
-1. Check System Settings → Privacy & Security → Accessibility
-2. Ensure Quickdict is enabled
-
-### No audio input detected
-
-1. Check System Settings → Privacy & Security → Microphone
-2. Ensure Quickdict is enabled
-3. Try refreshing microphones in Settings
-
-### Text doesn't paste
-
-1. Ensure the target app has a text field focused
-2. Check that Accessibility permission is granted
-
-### Transform not working
-
-1. Ensure Ollama is installed: `brew install ollama`
-2. Ensure Qwen model is pulled: `ollama pull qwen2.5:2b`
-3. Ensure Ollama is running: `ollama serve`
-4. Check "Transform selected text" is enabled in Settings
-
-## Architecture
-
-```
-Quickdict/
-├── Sources/
-│   ├── App/              main.swift, AppDelegate.swift
-│   ├── Core/
-│   │   ├── Audio/       AVAudioEngine capture, VAD
-│   │   ├── ASR/         CoreML inference (demo mode)
-│   │   ├── LLM/         Transform via Ollama
-│   │   ├── Processing/  Text pipeline (fillers, ITN, etc.)
-│   │   └── Output/      Clipboard, auto-paste, auto-send
-│   ├── Hotkey/           Carbon Events global hotkey
-│   ├── Settings/         UserDefaults persistence
-│   └── UI/
-│       ├── MenuBar/     Status item, recording indicator
-│       └── Settings/    Settings panels
-└── Resources/
-    ├── Info.plist
-    └── Quickdict.entitlements
-```
-
-## Building from Source
+## Build From Source
 
 ```bash
-# Generate Xcode project
 xcodegen generate
+/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
+  -project Quickdict.xcodeproj \
+  -scheme Quickdict \
+  -configuration Release \
+  -derivedDataPath ./build \
+  build
+```
 
-# Build
-xcodebuild -project Quickdict.xcodeproj -scheme Quickdict -configuration Release build
+## Local Signed Install
 
-# Create DMG
+If you are developing locally and want a stable installed app identity:
+
+```bash
+./Scripts/install-local-signed.sh
+```
+
+This script:
+
+- builds Quickdict
+- copies it to `/Applications/Quickdict.app`
+- signs it with a local Apple Development identity if available
+
+## Create DMG
+
+```bash
 ./Scripts/create-dmg.sh
 ```
 
-## License
+This creates:
 
-MIT License
+- `Quickdict-1.0.0.dmg`
+
+## Troubleshooting
+
+### Global hotkey does not work
+
+Check:
+
+1. Accessibility is enabled
+2. Input Monitoring is enabled
+3. You relaunched Quickdict after enabling them
+
+### Dictation records but no text appears
+
+Check:
+
+1. Microphone permission is enabled
+2. The selected ASR model shows `Ready`
+3. You are using `Parakeet v3` for lowest latency
+
+### Transform does nothing
+
+Check:
+
+1. Ollama is running
+2. A transform model is installed and selected
+3. Text was selected before dictation started
+
+## Distribution Notes
+
+For other people to use the app, the most practical path is:
+
+1. Build a release app
+2. Create a DMG
+3. Upload the DMG to a GitHub Release
+4. Include these permission steps in the release notes
+
+If you want fully smooth public distribution, the long-term path is Apple code signing + notarization.
