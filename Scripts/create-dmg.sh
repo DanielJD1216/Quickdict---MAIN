@@ -29,7 +29,8 @@ fi
 
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR"
-cp -R "$APP_PATH" "$STAGING_DIR/$APP_NAME.app"
+xattr -cr "$APP_PATH"
+ditto "$APP_PATH" "$STAGING_DIR/$APP_NAME.app"
 cp "$ROOT_DIR/README.md" "$STAGING_DIR/README.md"
 ln -s /Applications "$STAGING_DIR/Applications"
 xattr -cr "$STAGING_DIR/$APP_NAME.app"

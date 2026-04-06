@@ -65,13 +65,25 @@ final class OllamaClient: LLMClient {
 
     func transform(text: String, command: String) async throws -> String {
         let document = StructuredTransformDocument.parse(text)
+        let expectedLineCount = document.segments.count
+        let originalEditableText = document.editableText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
             let transformed = try await transformViaChat(text: document.editableText, command: command)
-            return document.rebuild(with: transformed) ?? transformed
+            let cleaned = sanitizeTransformedText(transformed, command: command, expectedLineCount: expectedLineCount)
+            guard !cleaned.isEmpty,
+                  cleaned.trimmingCharacters(in: .whitespacesAndNewlines) != originalEditableText else {
+                throw LLMError.emptyResponse
+            }
+            return document.rebuild(with: cleaned) ?? cleaned
         } catch LLMError.emptyResponse {
             let transformed = try await transformViaGenerate(text: document.editableText, command: command)
-            return document.rebuild(with: transformed) ?? transformed
+            let cleaned = sanitizeTransformedText(transformed, command: command, expectedLineCount: expectedLineCount)
+            guard !cleaned.isEmpty,
+                  cleaned.trimmingCharacters(in: .whitespacesAndNewlines) != originalEditableText else {
+                throw LLMError.emptyResponse
+            }
+            return document.rebuild(with: cleaned) ?? cleaned
         }
     }
 
@@ -82,11 +94,11 @@ final class OllamaClient: LLMClient {
             "messages": [
                 [
                     "role": "system",
-                    "content": "You are a text transformation assistant. Apply the user's command to each line of content while preserving the number of lines and the overall structure. Return only the transformed content lines, one line per input line, with no preamble, no explanations, and no markdown fencing. Never return an empty response."
+                    "content": "You rewrite text based on the user's instruction. The command is an instruction, not content. Never repeat the command. Never output labels, explanations, or markdown. Return only the rewritten text, preserving the overall structure and tone requested by the command."
                 ],
                 [
                     "role": "user",
-                    "content": "Editable content lines:\n\(text)\n\nCommand:\n\(command)\n\nReturn exactly one transformed line for each input line, in the same order."
+                    "content": "<command>\n\(command)\n</command>\n<content>\n\(text)\n</content>"
                 ]
             ],
             "stream": false,
@@ -115,19 +127,14 @@ final class OllamaClient: LLMClient {
             throw LLMError.invalidResponse
         }
 
-        let trimmed = sanitizeTransformedText(responseText)
-        guard !trimmed.isEmpty else {
-            throw LLMError.emptyResponse
-        }
-
-        return trimmed
+        return responseText
     }
 
     private func transformViaGenerate(text: String, command: String) async throws -> String {
         let requestBody: [String: Any] = [
             "model": model,
             "think": false,
-            "prompt": "Apply this command to the content lines below and return exactly one transformed line per input line, in the same order. Do not add headings or explanations.\n\nCommand:\n\(command)\n\nContent lines:\n\(text)",
+            "prompt": "Rewrite the content below using the command. The command is an instruction, not part of the content. Return only the rewritten text with no labels or explanations.\n\n<command>\n\(command)\n</command>\n<content>\n\(text)\n</content>",
             "stream": false,
             "options": [
                 "temperature": 0.2,
@@ -153,21 +160,23 @@ final class OllamaClient: LLMClient {
             throw LLMError.invalidResponse
         }
 
-        let trimmed = sanitizeTransformedText(responseText)
-        guard !trimmed.isEmpty else {
-            throw LLMError.emptyResponse
-        }
-
-        return trimmed
+        return responseText
     }
 
-    private func sanitizeTransformedText(_ text: String) -> String {
+    private func sanitizeTransformedText(_ text: String, command: String, expectedLineCount: Int) -> String {
         let lines = text
-            .split(whereSeparator: \ .isNewline)
+            .split(omittingEmptySubsequences: false, whereSeparator: \ .isNewline)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
 
         let bannedPrefixes = [
             "command:",
+            "editable content lines:",
+            "content lines:",
+            "<command>",
+            "</command>",
+            "<content>",
+            "</content>",
+            "return exactly one transformed line for each input line",
             "return only the transformed text",
             "return only the rewritten list",
             "original text:",
@@ -175,9 +184,14 @@ final class OllamaClient: LLMClient {
             "commander"
         ]
 
+        let normalizedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
         let cleanedLines = lines.filter { line in
             let lower = line.lowercased()
             guard !lower.isEmpty else { return true }
+            if lower == normalizedCommand {
+                return false
+            }
             return !bannedPrefixes.contains(where: { lower.hasPrefix($0) })
         }
 

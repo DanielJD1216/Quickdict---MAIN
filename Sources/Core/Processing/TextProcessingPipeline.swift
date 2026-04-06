@@ -239,14 +239,48 @@ struct AutoPunctuation {
 
 struct BulletFormatter {
     private static let bulletTriggers = [
-        "bullet", "next bullet", "new bullet", "bullet point"
+        "bullet", "next bullet", "new bullet", "bullet point",
+        "point", "next point", "new point", "dot point", "dash"
+    ]
+
+    private static let explicitListCuePatterns = [
+        "shopping list", "grocery list", "to-?do list", "todo list", "checklist",
+        "things to buy", "things i need to buy", "things to do", "stuff i need to do",
+        "lista de compras", "lista de la compra", "lista del supermercado", "lista de tareas", "lista de pendientes",
+        "liste de courses", "liste de taches", "liste de tâches", "choses a acheter", "choses à acheter", "choses a faire", "choses à faire",
+        "einkaufsliste", "to-?do-liste", "aufgabenliste",
+        "lista do supermercado", "lista de afazeres",
+        "lista della spesa", "lista delle cose da fare",
+        "boodschappenlijst", "boodschappenlijstje", "to-?do-lijst", "takenlijst"
+    ]
+
+    private static let actionListCuePatterns = [
+        #"(?:i\s*(?:am|'m)\s+going\s+to\s+do)"#, #"(?:i\s+need\s+to\s+(?:buy|get|do))"#, #"(?:need\s+to\s+(?:buy|get|do))"#,
+        #"(?:to\s+)?(?:get|buy|grab|pick up|pickup|need|do)"#,
+        #"(?:tengo\s+que\s+(?:comprar|hacer))"#, #"(?:necesito\s+(?:comprar|hacer))"#,
+        #"(?:je\s+dois\s+(?:acheter|faire))"#, #"(?:il\s+faut\s+(?:acheter|faire))"#,
+        #"(?:ich\s+muss\s+(?:kaufen|erledigen|machen))"#,
+        #"(?:preciso\s+(?:comprar|fazer))"#, #"(?:tenho\s+que\s+(?:comprar|fazer))"#,
+        #"(?:devo\s+(?:comprare|fare))"#,
+        #"(?:ik\s+moet\s+(?:kopen|doen))"#
+    ]
+
+    private static let spokenListSeparatorPatterns = [
+        #"\b(?:0|zero|oh)\s+(?:also|then|next|plus)\b"#,
+        #"\b(?:and then|also|then|plus|next|too)\b"#,
+        #"\b(?:también|y luego|después)\b"#,
+        #"\b(?:aussi|puis|ensuite)\b"#,
+        #"\b(?:auch|dann)\b"#,
+        #"\b(?:também|depois)\b"#,
+        #"\b(?:anche|poi)\b"#,
+        #"\b(?:ook|dan)\b"#
     ]
 
     static func process(_ text: String) -> String {
         let lowercased = text.lowercased()
 
         if bulletTriggers.contains(where: { lowercased.contains($0) }) {
-            let pattern = "(?i)(?:^|\\s)(?:next bullet|new bullet|bullet point|bullet)\\s+"
+            let pattern = "(?i)(?:^|\\s|,)(?:next bullet|new bullet|bullet point|bullet|next point|new point|dot point|point|dash)[:,-]?\\s+"
             if let regex = try? NSRegularExpression(pattern: pattern) {
                 let nsRange = NSRange(text.startIndex..., in: text)
                 let matches = regex.matches(in: text, range: nsRange)
@@ -257,9 +291,12 @@ struct BulletFormatter {
                     let itemStart = match.range.upperBound
                     let itemEnd = index + 1 < matches.count ? matches[index + 1].range.location : (text as NSString).length
                     let range = NSRange(location: itemStart, length: itemEnd - itemStart)
-                    let item = (text as NSString).substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let item = (text as NSString)
+                        .substring(with: range)
+                        .replacingOccurrences(of: "^(?:and|then)\\s+", with: "", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
                     if !item.isEmpty {
-                        items.append("• \(item)")
+                        items.append(contentsOf: expandBulletItem(item).map { "• \(capitalizingFirstLetter($0))" })
                     }
                 }
                 if !items.isEmpty {
@@ -288,6 +325,104 @@ struct BulletFormatter {
             }
         }
 
+        if let markerRange = text.range(of: #"(?i)\b(?:0|zero|oh)[\.\)]?\s+"#, options: .regularExpression) {
+            let tail = String(text[markerRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let items = expandBulletItem(tail).map { "• \(capitalizingFirstLetter($0))" }
+            if items.count >= 2 {
+                return items.joined(separator: "\n")
+            }
+        }
+
+        if let tail = extractTail(for: explicitListCuePatterns, in: text) {
+            let items = expandBulletItem(tail).map { "• \(capitalizingFirstLetter($0))" }
+            if items.count >= 2 {
+                return items.joined(separator: "\n")
+            }
+        }
+
+        if let tail = extractTail(for: actionListCuePatterns, in: text) {
+            let items = expandBulletItem(tail).map { "• \(capitalizingFirstLetter($0))" }
+            if items.count >= 2 {
+                return items.joined(separator: "\n")
+            }
+        }
+
         return text
+    }
+
+    private static func capitalizingFirstLetter(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return first.uppercased() + text.dropFirst()
+    }
+
+    private static func expandBulletItem(_ text: String) -> [String] {
+        let cleaned = normalizeListFragment(text)
+        let normalizedSeparators = normalizeSpokenListSeparators(cleaned)
+        let fragments = normalizedSeparators
+            .split(separator: ",", omittingEmptySubsequences: true)
+            .map { normalizeListFragment(String($0)) }
+            .filter { !$0.isEmpty }
+
+        guard fragments.count > 1 else {
+            return cleaned.isEmpty ? [] : [cleaned]
+        }
+
+        let firstFragmentHadSingularArticle = text.range(of: "^(?:get|buy|grab|pick up|pickup|need)\\s+(?:a|an)\\s+", options: .regularExpression) != nil ||
+            text.range(of: "^(?:a|an)\\s+", options: .regularExpression) != nil
+
+        return fragments.map { fragment in
+            guard firstFragmentHadSingularArticle else { return fragment }
+            return pluralizeSingleWord(fragment)
+        }
+    }
+
+    private static func normalizeListFragment(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "^(?:(?:i\\s*(?:am|'m)\\s+going\\s+to\\s+do)|(?:i\\s+need\\s+to\\s+(?:buy|get|do))|(?:need\\s+to\\s+(?:buy|get|do))|(?:to\\s+)?(?:get|buy|grab|pick up|pickup|need|do)|(?:tengo\\s+que\\s+(?:comprar|hacer))|(?:necesito\\s+(?:comprar|hacer))|(?:je\\s+dois\\s+(?:acheter|faire))|(?:il\\s+faut\\s+(?:acheter|faire))|(?:ich\\s+muss\\s+(?:kaufen|erledigen|machen))|(?:preciso\\s+(?:comprar|fazer))|(?:tenho\\s+que\\s+(?:comprar|fazer))|(?:devo\\s+(?:comprare|fare))|(?:ik\\s+moet\\s+(?:kopen|doen)))\\s+", with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^(?:and|and then|also|then|plus|next|too)\s+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "^(?:some|a|an|the)\\s+", with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+(?:0|zero|oh)$"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+    }
+
+    private static func extractTail(for cuePatterns: [String], in text: String) -> String? {
+        let pattern = "(?i)\\b(?:\(cuePatterns.joined(separator: "|")))\\b[:\\s,-]+(.+)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+
+        let nsRange = NSRange(text.startIndex..., in: text)
+        guard let match = regex.firstMatch(in: text, range: nsRange), match.numberOfRanges > 1,
+              let range = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+
+        return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func normalizeSpokenListSeparators(_ text: String) -> String {
+        spokenListSeparatorPatterns.reduce(text) { partialResult, pattern in
+            partialResult.replacingOccurrences(of: pattern, with: ", ", options: .regularExpression)
+        }
+    }
+
+    private static func pluralizeSingleWord(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(" ") else { return trimmed }
+
+        let lowercased = trimmed.lowercased()
+        if lowercased.hasSuffix("s") {
+            return trimmed
+        }
+        if lowercased.hasSuffix("y"), lowercased.count > 1 {
+            let vowelBeforeY = ["a", "e", "i", "o", "u"].contains(String(lowercased.dropLast().suffix(1)))
+            if !vowelBeforeY {
+                return String(trimmed.dropLast()) + "ies"
+            }
+        }
+        if lowercased.hasSuffix("ch") || lowercased.hasSuffix("sh") || lowercased.hasSuffix("x") || lowercased.hasSuffix("z") {
+            return trimmed + "es"
+        }
+        return trimmed + "s"
     }
 }
