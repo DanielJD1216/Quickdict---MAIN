@@ -25,7 +25,7 @@ Quickdict is a native macOS app for system-wide dictation with local ASR models 
 
 ### DMG Install
 
-1. Open `Quickdict-1.0.0.dmg`
+1. Open `Quickdict-1.0.1.dmg`
 2. Drag `Quickdict.app` into `Applications`
 3. Open `Applications/Quickdict.app`
 
@@ -144,7 +144,7 @@ This script:
 
 This creates:
 
-- `Quickdict-1.0.0.dmg`
+- `Quickdict-1.0.1.dmg`
 
 ## Troubleshooting
 

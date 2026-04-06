@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="Quickdict"
-VERSION="1.0.0"
+VERSION="1.0.1"
 BUILD_DIR="$ROOT_DIR/build/Build/Products/Release"
 APP_PATH="$BUILD_DIR/$APP_NAME.app"
 DMG_NAME="$ROOT_DIR/$APP_NAME-$VERSION.dmg"
