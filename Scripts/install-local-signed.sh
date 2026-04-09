@@ -28,7 +28,8 @@ xcodegen generate >/dev/null
 
 echo "Installing app to /Applications..."
 rm -rf "$INSTALL_PATH"
-cp -R "$APP_PATH" "$INSTALL_PATH"
+xattr -cr "$APP_PATH"
+ditto "$APP_PATH" "$INSTALL_PATH"
 xattr -cr "$INSTALL_PATH"
 
 echo "Signing installed app with: $IDENTITY"

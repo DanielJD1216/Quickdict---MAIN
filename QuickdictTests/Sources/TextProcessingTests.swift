@@ -21,13 +21,31 @@ final class TextProcessingTests: XCTestCase {
 
     func testBulletFormatterHandlesSpokenBulletTriggers() {
         let input = "bullet bananas next bullet peanuts next bullet apples"
-        let expected = "• bananas\n• peanuts\n• apples"
+        let expected = "• Bananas\n• Peanuts\n• Apples"
         XCTAssertEqual(BulletFormatter.process(input), expected)
     }
 
     func testBulletFormatterConvertsSimpleNumberedListToBullets() {
         let input = "1 bananas 2 peanuts 3 apples"
         let expected = "• Bananas\n• Peanuts\n• Apples"
+        XCTAssertEqual(BulletFormatter.process(input), expected)
+    }
+
+    func testBulletFormatterConvertsShoppingSentenceToBullets() {
+        let input = "I'm gonna go to the grocery store to get some bananas, peanuts, apples, potatoes."
+        let expected = "• Bananas\n• Peanuts\n• Apples\n• Potatoes"
+        XCTAssertEqual(BulletFormatter.process(input), expected)
+    }
+
+    func testBulletFormatterSplitsSpokenTodoSeparators() {
+        let input = "I need to do workout also homework also finalize the contract"
+        let expected = "• Workout\n• Homework\n• Finalize the contract"
+        XCTAssertEqual(BulletFormatter.process(input), expected)
+    }
+
+    func testBulletFormatterSupportsMultilingualListCue() {
+        let input = "lista de compras leche, huevos, pan"
+        let expected = "• Leche\n• Huevos\n• Pan"
         XCTAssertEqual(BulletFormatter.process(input), expected)
     }
 }
