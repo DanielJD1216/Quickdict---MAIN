@@ -31,7 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            mainWindow?.makeKeyAndOrderFront(nil)
+            showMainWindow()
         }
         return true
     }
@@ -152,6 +152,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
 
         mainWindow?.title = "Quickdict"
         mainWindow?.minSize = NSSize(width: 900, height: 600)
+        mainWindow?.isReleasedWhenClosed = false
         mainWindow?.contentView = NSHostingView(rootView: contentView)
         mainWindow?.center()
         mainWindow?.makeKeyAndOrderFront(nil)
@@ -178,6 +179,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioCaptureDelegate {
     }
 
     @objc private func showMainWindow() {
+        if mainWindow == nil {
+            setupMainWindow()
+            return
+        }
+
         mainWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
