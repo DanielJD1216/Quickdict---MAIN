@@ -19,6 +19,12 @@ final class TextProcessingTests: XCTestCase {
         XCTAssertEqual(InverseTextNormalizer.process("one hundred twenty five"), "125")
     }
 
+    func testNumberConversionDoesNotConvertStandaloneAndToZero() {
+        XCTAssertEqual(InverseTextNormalizer.process("bread and butter"), "bread and butter")
+        XCTAssertEqual(InverseTextNormalizer.process("and then we go"), "and then we go")
+        XCTAssertEqual(InverseTextNormalizer.process("one hundred and five"), "105")
+    }
+
     func testBulletFormatterHandlesSpokenBulletTriggers() {
         let input = "bullet bananas next bullet peanuts next bullet apples"
         let expected = "• Bananas\n• Peanuts\n• Apples"

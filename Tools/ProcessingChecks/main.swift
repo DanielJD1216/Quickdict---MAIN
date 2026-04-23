@@ -15,6 +15,8 @@ passed = expect(FillerWordRemover.process("um hello world") == "hello world", "f
 passed = expect(FalseStartDetector.process("the the quick brown fox") == "the quick brown fox", "false-start detector should remove repeated lead-in") && passed
 passed = expect(InverseTextNormalizer.process("twenty three dollars") == "$23", "ITN should convert spoken currency") && passed
 passed = expect(InverseTextNormalizer.process("forty two percent growth") == "42% growth", "ITN should convert percentages") && passed
+passed = expect(InverseTextNormalizer.process("bread and butter") == "bread and butter", "ITN should not convert standalone 'and' to zero") && passed
+passed = expect(InverseTextNormalizer.process("one hundred and five") == "105", "ITN should still allow 'and' inside number phrases") && passed
 passed = expect(BulletFormatter.process("bullet bananas next bullet peanuts next bullet apples") == "• Bananas\n• Peanuts\n• Apples", "bullet formatter should split spoken bullet triggers") && passed
 passed = expect(BulletFormatter.process("1 bananas 2 peanuts 3 apples") == "• Bananas\n• Peanuts\n• Apples", "bullet formatter should convert numbered list patterns") && passed
 passed = expect(BulletFormatter.process("I'm gonna go to the grocery store to get some bananas, peanuts, apples, potatoes.") == "• Bananas\n• Peanuts\n• Apples\n• Potatoes", "bullet formatter should convert shopping sentences") && passed

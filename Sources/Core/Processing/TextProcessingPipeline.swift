@@ -191,6 +191,11 @@ struct InverseTextNormalizer {
                 break
             }
             if ignorableWords.contains(cleaned) {
+                guard consumed > 0,
+                      index + 1 < tokens.count,
+                      isNumberComponent(normalizedToken(tokens[index + 1])) else {
+                    break
+                }
                 index += 1
                 consumed += 1
                 continue
@@ -217,6 +222,10 @@ struct InverseTextNormalizer {
 
         guard consumed > 0 else { return nil }
         return (total + current, consumed)
+    }
+
+    private static func isNumberComponent(_ token: String) -> Bool {
+        baseNumbers[token] != nil || multipliers[token] != nil
     }
 
     private static func normalizedToken(_ token: String) -> String {
